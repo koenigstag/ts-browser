@@ -8,32 +8,27 @@ const defaultImportMap = {
 };
 
 /**
- * @returns {ImportMap | null} parsed import map object or null if not found
+ * @param {HTMLScriptElement} node
+ * @returns {ImportMap} parsed import map object
  */
-export const getImportMap = () => {
-    if (typeof window === 'undefined' || typeof window.document === 'undefined') {
-        return null;
+function parseImportMap(node) {
+    try {
+        const parsed = JSON.parse(node?.textContent || '{}');
+        return {
+            imports: parsed.imports || {},
+            integrity: parsed.integrity || {},
+            scopes: parsed.scopes || {}
+        };
+    } catch {
+        return defaultImportMap;
     }
+}
 
-    // get all <script type="importmap"> nodes in the document
-    const nodes = document.querySelectorAll('script[type="importmap"]');
-
-    function parseImportMap(node) {
-        try {
-            const parsed = JSON.parse(node?.textContent || '{}');
-            return {
-                imports: parsed.imports || {},
-                integrity: parsed.integrity || {},
-                scopes: parsed.scopes || {}
-            };
-        } catch {
-            return defaultImportMap;
-        }
-    }
-
-    const importMaps = Array.from(nodes).map(parseImportMap);
-
-    // merge all import maps into a single object
+/**
+ * @param {Array<ImportMap>} importMaps
+ * @returns {ImportMap} merged import map object
+ */
+function mergeImportMaps(importMaps = []) {
     const mergedImportMap = importMaps.reduce((acc, curr) => {
         const mergedScopes = { ...acc.scopes };
         // first scope wins in case of key conflicts within a scope
@@ -51,6 +46,25 @@ export const getImportMap = () => {
             scopes: mergedScopes,
         };
     }, defaultImportMap);
+
+    return mergedImportMap;
+}
+
+
+/**
+ * @returns {ImportMap | null} parsed import map object or null if not found
+ */
+export const getImportMap = () => {
+    if (typeof window === 'undefined' || typeof window.document === 'undefined') {
+        return null;
+    }
+
+    // get all <script type="importmap"> nodes in the document
+    const nodes = document.querySelectorAll('script[type="importmap"]');
+
+    const parsedImportMaps = Array.from(nodes).map(parseImportMap);
+
+    const mergedImportMap = mergeImportMaps(parsedImportMaps);
 
     window.ImportMap = mergedImportMap; // for debugging purposes
 
