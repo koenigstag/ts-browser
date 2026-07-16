@@ -1,0 +1,24 @@
+<html>
+<body>
+<p>Running circular-pair test...</p>
+<script type="module">
+    import {loadModule} from '../src/ts-browser.js';
+    loadModule('./fixtures/circular-pair/entry.ts').then(mod => {
+        const {result} = mod;
+        const ok = result.aGreetOutput === 'A says: B says hi' &&
+            result.bCallsAOutput === 'A says: B says hi' &&
+            result.sharedFromA === 'shared-42';
+        if (ok) {
+            alert('circular-pair OK: cyclic edge (b.ts -> a.ts) still resolves via the ' +
+                'targeted Proxy fallback, while the non-cyclic edges (a.ts -> b.ts, both -> shared.ts) ' +
+                'get real native live bindings');
+        } else {
+            alert('circular-pair FAILED: ' + JSON.stringify(result));
+        }
+    }).catch(exc => {
+        console.error(exc);
+        alert('circular-pair ERROR: ' + exc.message);
+    });
+</script>
+</body>
+</html>

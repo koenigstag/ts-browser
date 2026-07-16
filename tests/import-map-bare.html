@@ -1,0 +1,53 @@
+<!--
+Manual check (not automatable by the alert() below): open DevTools > Network
+before running this page, then confirm external-lib.js is fetched exactly
+once as a plain top-level request - never routed through the worker/
+transpile pipeline (no "generateJsCode" round-trip for it).
+-->
+<html>
+<head>
+<script type="importmap">
+{"imports": {"some-lib": "./fixtures/import-map-bare/external-lib.js"}}
+</script>
+</head>
+<body>
+<p>Running import-map-bare test...</p>
+<script type="module">
+    import {loadModule} from '../src/ts-browser.js';
+
+    const mappedTest = loadModule('./fixtures/import-map-bare/index.ts').then(mod => {
+        if (!mod.result.greeting.startsWith('Hello from external-lib')) {
+            throw new Error('mapped specifier FAILED: ' + JSON.stringify(mod.result));
+        }
+        return 'mapped specifier OK (browser resolved it natively)';
+    }, exc => {
+        throw new Error('mapped specifier load FAILED: ' + (exc && exc.message || exc));
+    });
+
+    // NOTE: a bare specifier not found in the import map does NOT throw a clean
+    // "Cannot resolve bare import" error - it falls through to being treated as
+    // a same-directory relative file instead (this project's addPathToUrl has
+    // always allowed a dot-less specifier as a relative import, e.g. IDEA-style
+    // auto-import - see tests/UrlPathResolverTest.js's "ServApi" case - so an
+    // unmapped bare specifier can't be distinguished from that case up front).
+    // It just fails later as an ordinary "file not found" fetch error instead.
+    const unmappedTest = loadModule('./fixtures/import-map-bare/not-mapped.ts').then(
+        () => { throw new Error('unmapped specifier should have failed to load, but did not'); },
+        exc => {
+            const msg = String((exc && exc.message) || exc);
+            if (msg.includes('not-mapped-lib') || msg.includes('attempts failed') || msg.includes('Failed to fetch')) {
+                return 'unmapped specifier correctly failed to load (as a not-found relative file): ' + msg;
+            }
+            throw exc;
+        }
+    );
+
+    Promise.all([mappedTest, unmappedTest]).then(results => {
+        alert('import-map-bare OK: ' + results.join(' | '));
+    }).catch(exc => {
+        console.error(exc);
+        alert('import-map-bare ERROR: ' + exc.message);
+    });
+</script>
+</body>
+</html>

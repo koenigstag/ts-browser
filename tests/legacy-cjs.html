@@ -1,0 +1,30 @@
+<html>
+<body>
+<p>Running legacy-cjs test...</p>
+<script type="module">
+    import {loadModule} from '../src/ts-browser.js';
+
+    const staticTest = loadModule('./fixtures/legacy-cjs/static-side-effect.ts').then(mod => {
+        if (mod.result !== 'hi from legacy lib') {
+            throw new Error('static side-effect FAILED: ' + mod.result);
+        }
+        return 'static side-effect import OK';
+    });
+
+    const dynamicTest = loadModule('./fixtures/legacy-cjs/dynamic-entry.ts').then(async mod => {
+        const legacyMod = await mod.loadLegacyDynamically();
+        if (legacyMod.LegacyLibGlobal2 !== 'legacy-value-2') {
+            throw new Error('dynamic entry FAILED: ' + JSON.stringify(legacyMod));
+        }
+        return 'dynamic entry point OK';
+    });
+
+    Promise.all([staticTest, dynamicTest]).then(results => {
+        alert('legacy-cjs OK: ' + results.join(' | '));
+    }).catch(exc => {
+        console.error(exc);
+        alert('legacy-cjs ERROR: ' + exc.message);
+    });
+</script>
+</body>
+</html>

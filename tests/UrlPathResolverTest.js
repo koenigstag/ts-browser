@@ -81,10 +81,28 @@ const testCases = [
         },
         output: '../../stuffPackage/doStuff.ts',
     },
+    {
+        title: 'A bare specifier covered by a flat import map entry resolves to the mapped URL',
+        input: {
+            baseUrl: './index.ts',
+            path: 'some-lib',
+            importMap: {imports: {'some-lib': 'https://cdn.example.com/some-lib.js'}},
+        },
+        output: 'https://cdn.example.com/some-lib.js',
+    },
+    {
+        title: 'A dot-less specifier NOT in the import map still falls back to relative resolution (no regression, no throw)',
+        input: {
+            baseUrl: "../../src/utils/YoutubeApi",
+            path: "ServApi",
+            importMap: {imports: {'some-other-lib': 'https://cdn.example.com/x.js'}},
+        },
+        output: '../../src/utils/ServApi',
+    },
 ];
 
 const test = async ({title, input, output}) => {
-    const actual = addPathToUrl(input.path, input.baseUrl);
+    const actual = addPathToUrl(input.path, input.baseUrl, input.importMap);
     if (actual === output) {
         return Promise.resolve();
     } else {

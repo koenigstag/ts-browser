@@ -1,0 +1,33 @@
+<html>
+<body>
+<p>Loading entry module...</p>
+<button id="loadBtn" disabled>Load lazy route</button>
+<script type="module">
+    import {loadModule} from '../src/ts-browser.js';
+    const btn = document.getElementById('loadBtn');
+    loadModule('./fixtures/dynamic-lazy-route/entry.ts').then(mod => {
+        // by the time the button is clicked, loadModule()'s own root-resolve
+        // revoke sweep has already run and completed - this exercises whether
+        // the dynamicImportUrls exemption correctly kept lazyRoute.ts's future
+        // Blob URL alive (it hasn't been created yet at click-availability time,
+        // but its EVENTUAL blob must not be revoked prematurely once it is)
+        btn.disabled = false;
+        btn.onclick = () => {
+            mod.loadLazyRoute().then(value => {
+                if (value === 'lazy-route-loaded') {
+                    alert('dynamic-lazy-route OK: lazy import succeeded after root-resolve revoke sweep');
+                } else {
+                    alert('dynamic-lazy-route FAILED: got ' + value);
+                }
+            }).catch(exc => {
+                console.error(exc);
+                alert('dynamic-lazy-route ERROR: ' + exc.message);
+            });
+        };
+    }).catch(exc => {
+        console.error(exc);
+        alert('dynamic-lazy-route ERROR (entry load): ' + exc.message);
+    });
+</script>
+</body>
+</html>

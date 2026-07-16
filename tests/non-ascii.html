@@ -1,0 +1,19 @@
+<html>
+<body>
+<p>Running non-ascii test...</p>
+<script type="module">
+    import {loadModule} from '../src/ts-browser.js';
+    loadModule('./fixtures/non-ascii/index.ts').then(mod => {
+        const expected = 'Привет мир! 日本語 emoji: 🎉🚀';
+        if (mod.nonAsciiString === expected) {
+            alert('non-ascii OK: string round-tripped correctly through the Blob pipeline');
+        } else {
+            alert('non-ascii FAILED: got ' + mod.nonAsciiString);
+        }
+    }).catch(exc => {
+        console.error(exc);
+        alert('non-ascii ERROR: ' + exc.message);
+    });
+</script>
+</body>
+</html>

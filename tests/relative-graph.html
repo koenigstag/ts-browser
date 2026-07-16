@@ -1,0 +1,31 @@
+<!--
+Manual DevTools checklist (not automatable by the alert() below):
+1. Open Chrome DevTools > Sources before clicking anything.
+2. Reload this page.
+3. Confirm a "ts-browser://script/..." tree entry exists per module (not
+   blob:...uuid / VM123 entries).
+4. Set a breakpoint inside fixtures/relative-graph/child.ts's bumpCounter().
+5. Reload the page again and confirm the breakpoint still hits at the same
+   location (proves toStableVirtualPath is a pure function of path only).
+-->
+<html>
+<body>
+<p>Running relative-graph test...</p>
+<script type="module">
+    import {loadModule} from '../src/ts-browser.js';
+    loadModule('./fixtures/relative-graph/index.ts').then(mod => {
+        const {result} = mod;
+        const ok = result.greetOutput === 'Hello, World' &&
+            result.initial === 1 && result.afterBump === 2;
+        if (ok) {
+            alert('relative-graph OK: live binding worked (counter went from 1 to 2)');
+        } else {
+            alert('relative-graph FAILED: ' + JSON.stringify(result));
+        }
+    }).catch(exc => {
+        console.error(exc);
+        alert('relative-graph ERROR: ' + exc.message);
+    });
+</script>
+</body>
+</html>

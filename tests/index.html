@@ -11,5 +11,15 @@
             alert('Got errors, see console - ' + exc);
         });
 </script>
+<hr>
+<p>Native import/export + Blob URL refactor - manual scenario pages:</p>
+<ul>
+    <li><a href="./relative-graph.html">relative-graph.html</a> - live bindings across a relative multi-file graph</li>
+    <li><a href="./circular-pair.html">circular-pair.html</a> - targeted Proxy fallback for the cyclic edge only</li>
+    <li><a href="./import-map-bare.html">import-map-bare.html</a> - flat import-map bare specifier passthrough + not-found throw</li>
+    <li><a href="./non-ascii.html">non-ascii.html</a> - non-ASCII source through the Blob pipeline</li>
+    <li><a href="./legacy-cjs.html">legacy-cjs.html</a> - legacy non-ESM .js interop (static side-effect + dynamic entry point)</li>
+    <li><a href="./dynamic-lazy-route.html">dynamic-lazy-route.html</a> - dynamic import after root-resolve revoke sweep (click the button)</li>
+</ul>
 </body>
 </html>
