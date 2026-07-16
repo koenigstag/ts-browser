@@ -1,5 +1,6 @@
 import {oneSuccess} from "./utils.js";
 import {addPathToUrl} from "./UrlPathResolver.js";
+import {getImportMap} from "./ImportMap.js";
 
 const EXPLICIT_EXTENSIONS = ['ts', 'js', 'tsx', 'jsx', 'mjs'];
 
@@ -80,31 +81,41 @@ const workers = [...Array(NUM_OF_WORKERS).keys()].map(i => {
                 referenceId: referenceId,
             });
             return new Promise((ok, err) => {
-                let reportJsCodeOk, reportJsCodeErr;
                 referenceIdToCallback.set(referenceId, (payload) => {
                     const {messageType, messageData} = payload;
                     if (messageType === 'parseTsModule_deps') {
                         const {isJsSrc, staticDependencies, dynamicDependencies} = messageData;
-                        const whenJsCode = new Promise((ok, err) => {
-                            [reportJsCodeOk, reportJsCodeErr] = [ok, err];
-                        });
-                        whenFree = whenJsCode;
-                        ok({
-                            isJsSrc, staticDependencies,
-                            dynamicDependencies, whenJsCode,
-                        });
-                    } else if (messageType === 'parseTsModule_code') {
-                        reportJsCodeOk(messageData.jsCode);
+                        // phase 1 (AST walk for imports) is fast and phase 2 is no
+                        // longer chained to it automatically - free this worker now,
+                        // requestJsCode() below drives phase 2 later, on demand
                         referenceIdToCallback.delete(referenceId);
+                        whenFree = Promise.resolve();
+                        ok({
+                            isJsSrc, staticDependencies, dynamicDependencies,
+                            requestJsCode: (cyclicDepUrls) => new Promise((codeOk, codeErr) => {
+                                referenceIdToCallback.set(referenceId, (payload2) => {
+                                    referenceIdToCallback.delete(referenceId);
+                                    if (payload2.messageType === 'generateJsCode_result') {
+                                        codeOk(payload2.messageData.jsCode);
+                                    } else {
+                                        codeErr(eventToError(payload2, 'Failed to generate JS code for ' + params.fullUrl));
+                                    }
+                                });
+                                worker.postMessage({
+                                    messageType: 'generateJsCode',
+                                    messageData: {cyclicDepUrls: [...cyclicDepUrls]},
+                                    referenceId: referenceId,
+                                });
+                            }),
+                        });
                     } else {
-                        const reject = reportJsCodeErr || err;
                         let contextMessage;
                         if (messageType === 'error') {
                             contextMessage = 'Failed to transpile ' + params.fullUrl;
                         } else {
                             contextMessage = 'Unexpected parseTsModule() worker response at ' + params.fullUrl;
                         }
-                        reject(eventToError(payload, contextMessage));
+                        err(eventToError(payload, contextMessage));
                         referenceIdToCallback.delete(referenceId);
                     }
                 });
@@ -274,21 +285,17 @@ const WorkerManager = ({compilerOptions}) => {
             // is often used as key without extension outside
             return {...fromCache, url};
         } else {
+            // must be read on the main thread (needs `document`) - the worker
+            // only ever receives the already-parsed importMap over postMessage
+            const importMap = getImportMap();
             return withFreeWorker(worker => worker.parseTsModule({
-                fullUrl, tsCode, compilerOptions,
-            })).then(({whenJsCode, ...importData}) => {
-                const rs = {url, ...importData};
-                if (!checksum) {
-                    // can't cache, as hashing function not available on non-https
-                } else if (fullUrl.endsWith('.ts') || fullUrl.endsWith('.tsx')) {
-                    // commenting for now since caching is disabled and some Mac OS environments complain about "The operation is insecure" in this function
-                    //whenJsCode.then(jsCode => {
-                    //    putToCache({...rs, fullUrl, checksum, jsCode});
-                    //});
-                } else {
-                    // no caching for large raw js libs
-                }
-                return {...rs, whenJsCode};
+                fullUrl, tsCode, compilerOptions, importMap,
+            })).then(({requestJsCode, ...importData}) => {
+                // NOTE: if localStorage caching is ever re-enabled, it would need
+                // to key by (checksum, cyclicDepUrls) instead of just checksum,
+                // since the same file's jsCode now depends on which of its own
+                // imports are flagged cyclic - not implemented, caching is disabled
+                return {url, fullUrl, ...importData, requestJsCode};
             });
         }
     };

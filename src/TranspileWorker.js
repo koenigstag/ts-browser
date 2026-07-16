@@ -15,23 +15,36 @@ const main = () => {
     /** @type {ts} */
     const ts = self.ts;
 
+    // keyed by referenceId - holds each pending parse's requestJsCode() closure
+    // between the fast `parseTsModule_deps` response and the later, explicitly
+    // driven `generateJsCode` request (which needs cyclicDepUrls, only knowable
+    // in ts-browser.js once the whole dependency graph has been discovered)
+    const pendingParses = new Map();
+
     const onmessage = (evt) => {
         const {data} = evt;
         const {messageType, messageData, referenceId} = data;
         if (messageType === 'parseTsModule') {
-            const {isJsSrc, staticDependencies, dynamicDependencies, getJsCode} =
+            const {isJsSrc, staticDependencies, dynamicDependencies, requestJsCode} =
                 org.klesun.tsBrowser.ParseTsModule_sideEffects({
                     ...messageData, ts: ts,
                     addPathToUrl: org.klesun.tsBrowser.addPathToUrl,
                 });
+            pendingParses.set(referenceId, requestJsCode);
             self.postMessage({
                 messageType: 'parseTsModule_deps',
                 messageData: {isJsSrc, staticDependencies, dynamicDependencies},
                 referenceId: referenceId,
             });
-            const jsCode = getJsCode();
+        } else if (messageType === 'generateJsCode') {
+            const requestJsCode = pendingParses.get(referenceId);
+            if (!requestJsCode) {
+                throw new Error('generateJsCode: no pending parse for referenceId ' + referenceId);
+            }
+            pendingParses.delete(referenceId);
+            const jsCode = requestJsCode(new Set(messageData.cyclicDepUrls));
             self.postMessage({
-                messageType: 'parseTsModule_code',
+                messageType: 'generateJsCode_result',
                 messageData: {jsCode},
                 referenceId: referenceId,
             });

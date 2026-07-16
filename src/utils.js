@@ -10,21 +10,16 @@ export const oneSuccess = (promises) => {
             err => Promise.resolve(err)
         );
     })).then(
-        // If '.all' resolved, we've just got an array of errors.
-        errors => Promise.reject(errors),
+        // If '.all' resolved, we've just got an array of errors - wrap them in
+        // a real Error (an array has no .message, which makes failures like
+        // "file not found under any extension" show up as "undefined" to callers)
+        errors => {
+            const combined = new Error('All ' + errors.length + ' attempts failed: ' +
+                errors.map(e => (e && e.message) || String(e)).join('; '));
+            combined.errors = errors;
+            return Promise.reject(combined);
+        },
         // If '.all' rejected, we've got the result we wanted.
         val => Promise.resolve(val)
     );
-};
-
-
-/** @cudos to https://stackoverflow.com/a/30106551/2750743 */
-export const b64EncodeUnicode = (str) => {
-    // first we use encodeURIComponent to get percent-encoded UTF-8,
-    // then we convert the percent encodings into raw bytes which
-    // can be fed into btoa.
-    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,
-        function toSolidBytes(match, p1) {
-            return String.fromCharCode('0x' + p1);
-        }));
 };
